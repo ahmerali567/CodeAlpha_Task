@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emotion Detector</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/framer-motion/dist/framer-motion.umd.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #1E3A8A, #9333EA, #E11D48);
+      min-height: 100vh;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      text-align: center;
+    }
+    .mic-btn {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #F43F5E, #7C3AED);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40px;
+      cursor: pointer;
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+      transition: all 0.3s;
+    }
+    .mic-btn:active {
+      transform: scale(0.9);
+      background: #E11D48;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="text-4xl font-bold mb-6">🎙️ Emotion Recognition from Speech</h1>
+
+  <button class="mic-btn" id="micButton">🎤</button>
+
+  <p id="status" class="mt-6 text-xl">Click to Record Your Emotion</p>
+  <h2 id="result" class="mt-4 text-3xl font-semibold"></h2>
+
+  <script>
+  const micButton = document.getElementById("micButton");
+  const statusText = document.getElementById("status");
+  const resultText = document.getElementById("result");
+  let mediaRecorder, audioChunks = [];
+
+  micButton.addEventListener("click", async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Your browser does not support microphone access.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      statusText.innerText = "🎙️ Recording... Speak Now!";
+      micButton.disabled = true;
+      micButton.style.opacity = "0.6";
+
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+      mediaRecorder.onstop = async () => {
+        micButton.disabled = false;
+        micButton.style.opacity = "1";
+        await sendAudio();
+      };
+
+      mediaRecorder.start();
+      console.log("🎤 Recording started");
+
+      setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          console.log("🛑 Recording stopped");
+        }
+      }, 4000);
+
+    } catch (err) {
+      console.error("Mic access error:", err);
+      alert("❌ Microphone access denied or not available. Please allow mic permission and reload.");
+    }
+  });
+
+  async function sendAudio() {
+    statusText.innerText = "🔍 Analyzing your voice...";
+    const blob = new Blob(audioChunks, { type: "audio/wav" });
+    const formData = new FormData();
+    formData.append("audio", blob, "recording.wav");
+
+    try {
+      const res = await fetch("/predict", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (data.error) {
+        resultText.innerText = "⚠️ Error: " + data.error;
+      } else {
+        resultText.innerText = `🎯 Emotion Detected: ${data.emotion}`;
+      }
+
+      statusText.innerText = "Click to Record Again 🎧";
+    } catch (e) {
+      console.error("Send error:", e);
+      resultText.innerText = "⚠️ Could not connect to server.";
+      statusText.innerText = "Please check your connection.";
+    }
+  }
+</script>
+
+
+</body>
+</html>
